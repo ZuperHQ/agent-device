@@ -27,8 +27,7 @@ import { releaseOnFailure, resolveLeaseValue, type LeaseValue } from './webdrive
 
 const AWS_DEVICE_FARM_PROVIDER = CLOUD_WEBDRIVER_PROVIDERS.awsDeviceFarm;
 // The capability map lives with the provider vocabulary in `providers.ts`, so composing the
-// registry does not evaluate this adapter; re-exported here for existing importers.
-export { AWS_DEVICE_FARM_CAPABILITY_OVERRIDES };
+// registry does not evaluate this adapter.
 
 export {
   listAwsDeviceFarmCloudArtifacts,

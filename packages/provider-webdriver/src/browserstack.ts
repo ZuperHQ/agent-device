@@ -36,12 +36,7 @@ import {
 const BROWSERSTACK_PROVIDER = CLOUD_WEBDRIVER_PROVIDERS.browserStack;
 
 // Endpoints and the capability map live with the provider vocabulary in `providers.ts`, so
-// composing the registry does not evaluate this adapter; re-exported here for existing importers.
-export {
-  BROWSERSTACK_APP_AUTOMATE_ENDPOINT,
-  BROWSERSTACK_APP_UPLOAD_ENDPOINT,
-  BROWSERSTACK_CAPABILITY_OVERRIDES,
-};
+// composing the registry does not evaluate this adapter.
 
 export type BrowserStackWebDriverRuntimeOptions = {
   clientVersion: string;
