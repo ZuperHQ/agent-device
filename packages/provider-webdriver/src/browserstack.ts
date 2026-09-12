@@ -1,5 +1,3 @@
-import fs from 'node:fs/promises';
-import path from 'node:path';
 import type { CloudArtifact, CloudArtifactsResult } from '@agent-device/contracts/observability';
 import {
   createCloudWebDriverCapabilities,
@@ -28,6 +26,7 @@ import { agentDeviceRequestHeaders } from './request-headers.ts';
 import { cloudArtifactsReadyOrPending } from './artifact-results.ts';
 import {
   basicAuthHeader,
+  postProviderAppUpload,
   resolveLeaseValue,
   trimTrailingSlash,
   type LeaseValue,
@@ -173,17 +172,13 @@ export async function uploadBrowserStackApp(
   options: BrowserStackUploadOptions,
   signal?: AbortSignal,
 ): Promise<string> {
-  signal?.throwIfAborted();
-  const file = await fs.readFile(appPath);
-  const form = new FormData();
-  form.set('file', new Blob([file]), path.basename(appPath));
-  const response = await fetch(options.endpoint ?? BROWSERSTACK_APP_UPLOAD_ENDPOINT, {
-    method: 'POST',
+  const response = await postProviderAppUpload({
+    appPath,
+    endpoint: options.endpoint ?? BROWSERSTACK_APP_UPLOAD_ENDPOINT,
     headers: {
       ...agentDeviceRequestHeaders(options.clientVersion),
       Authorization: basicAuthHeader(options),
     },
-    body: form,
     signal,
   });
   const json = (await response.json()) as unknown;

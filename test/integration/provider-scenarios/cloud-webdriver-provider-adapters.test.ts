@@ -142,6 +142,61 @@ test('BrowserStack facade nests device-feature capabilities inside bstack:option
   });
 }, 15_000);
 
+test('TestingBot facade prepares capabilities, uploads apps, and reports the session outcome', async () => {
+  await withProviderScenarioResource(FakeCloudProviderServer.start, async (server) => {
+    await withProviderScenarioTempDir('agent-device-testingbot-adapter-', async (tempDir) => {
+      const appPath = path.join(tempDir, 'demo.ipa');
+      fs.writeFileSync(appPath, 'fake ipa');
+      const provider = createProviderWebDriver({
+        clientVersion: CLIENT_VERSION,
+        runHostCommand: unexpectedHostCommand,
+      });
+      const runtime = runtimeFor(
+        provider.createDefaultRuntimes({
+          TESTINGBOT_KEY: 'tb-key',
+          TESTINGBOT_SECRET: 'tb-secret',
+          TESTINGBOT_WEBDRIVER_ENDPOINT: `${server.url}/wd/hub/`,
+          TESTINGBOT_API_ENDPOINT: `${server.url}/v1`,
+        }),
+        CLOUD_WEBDRIVER_PROVIDERS.testingBot,
+      );
+      const lease = makeLease(CLOUD_WEBDRIVER_PROVIDERS.testingBot);
+      try {
+        const allocation = await runtime.leaseLifecycle.allocate?.(lease, {
+          flags: {
+            platform: 'ios',
+            device: 'iPhone 17.*',
+            providerOsVersion: '26.*',
+            providerApp: appPath,
+            providerSessionName: `session-${lease.leaseId}`,
+            // Serialized as a string: the compact lease envelope forwards strings and booleans
+            // only, so a number would be dropped before it reached prepareSession.
+            providerMaxDuration: '3600',
+            providerTabletOnly: true,
+          },
+        });
+        assert.equal(allocation?.providerSessionId, 'wd-1');
+        assert.equal(operationSupport(allocation, 'artifacts'), 'supported');
+        assert.match(operationNote(allocation, 'portReverse') ?? '', /TestingBot Tunnel/);
+
+        const release = await runtime.leaseLifecycle.release?.(lease);
+        const artifacts = release?.cloudArtifacts as CloudArtifactsResult | undefined;
+        // Assets are not available yet, so only the dashboard link is reported and the result
+        // stays pending rather than claiming a video that is still processing.
+        assert.equal(artifacts?.status, 'pending');
+        assert.deepEqual(
+          artifacts?.cloudArtifacts.map((artifact) => artifact.kind),
+          ['provider-session'],
+        );
+      } finally {
+        await runtime.shutdown();
+      }
+
+      assertTestingBotCalls(server.calls, lease);
+    });
+  });
+}, 15_000);
+
 test('AWS Device Farm facade rejects unsupported device features at session preparation', async () => {
   await withProviderScenarioResource(FakeCloudProviderServer.start, async (server) => {
     const host = new FakeAwsHostCommand(`${server.url}/wd/hub/`);
@@ -386,6 +441,47 @@ function makeLease(provider: string): DeviceLease {
   };
 }
 
+function assertTestingBotCalls(calls: readonly CloudWebDriverHttpCall[], lease: DeviceLease): void {
+  const session = calls.find((call) => call.path === '/wd/hub/session');
+  const alwaysMatch =
+    (session?.body as { capabilities?: { alwaysMatch?: Record<string, unknown> } } | undefined)
+      ?.capabilities?.alwaysMatch ?? {};
+  assert.deepEqual(
+    {
+      platformName: alwaysMatch.platformName,
+      automationName: alwaysMatch['appium:automationName'],
+      app: alwaysMatch['appium:app'],
+      newCommandTimeout: alwaysMatch['appium:newCommandTimeout'],
+      tbOptions: alwaysMatch['tb:options'],
+    },
+    {
+      platformName: 'iOS',
+      automationName: 'XCUITest',
+      app: 'tb://uploaded-app',
+      newCommandTimeout: 600,
+      tbOptions: {
+        key: 'tb-key',
+        secret: 'tb-secret',
+        realDevice: true,
+        name: `session-${lease.leaseId}`,
+        build: lease.runId,
+        idletimeout: 600,
+        maxduration: 3600,
+        screenrecorder: true,
+        public: false,
+        tabletOnly: true,
+      },
+    },
+  );
+
+  const paths = calls.map((call) => `${call.method} ${call.path}`);
+  assert.ok(paths.includes('POST /v1/storage'), paths.join(', '));
+  // The hub mints the session id, so the outcome report can only happen after release.
+  // TestingBot records a session whose result was never reported as "unknown".
+  const outcome = calls.find((call) => call.path === '/v1/tests/wd-1' && call.body);
+  assert.equal((outcome?.body as Record<string, string> | undefined)?.['test[success]'], '1');
+}
+
 function assertBrowserStackCalls(
   calls: readonly CloudWebDriverHttpCall[],
   lease: DeviceLease,
@@ -518,6 +614,19 @@ class FakeCloudProviderServer extends CloudWebDriverTestServer {
         });
       case 'POST /app-automate/upload':
         return cloudWebDriverTestJson({ app_url: 'bs://uploaded-app' });
+      case 'POST /v1/storage':
+        return cloudWebDriverTestJson({ app_url: 'tb://uploaded-app' });
+      case 'GET /v1/storage/uploaded-app':
+        return cloudWebDriverTestJson({
+          app_url: 'tb://uploaded-app',
+          type: 'IOS',
+          state: 'DONE',
+          sim_only: false,
+        });
+      case 'GET /v1/tests/wd-1':
+        return cloudWebDriverTestJson({ session_id: 'wd-1', assets_available: false });
+      case 'PUT /v1/tests/wd-1':
+        return cloudWebDriverTestJson({ success: true });
       case 'GET /app-automate/sessions/wd-1.json':
         return cloudWebDriverTestJson({
           automation_session: {

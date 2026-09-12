@@ -14,6 +14,7 @@ import {
   SETTLE_DIFF_SAMPLE_NOTES,
   SETTLE_TAIL_SAMPLE,
   STALE_REF_SAMPLE,
+  TESTINGBOT_CONNECT_SAMPLE,
 } from '../help-conformance-sample-outputs.mjs';
 import { interactionCliOutputFormatters } from '../../src/commands/interaction/output.ts';
 import { snapshotCliOutput } from '../../src/commands/capture/output.ts';
@@ -491,6 +492,46 @@ export const SAMPLE_PRODUCERS: SampleProducer[] = [
           name: 'sample.apk',
           reference: 'bs://app-id',
           version: '1.2.3',
+        },
+      } satisfies ConnectVerification;
+      return renderConnectSuccess({
+        state,
+        readiness: presentConnectReadiness(state, facts),
+      });
+    },
+  },
+  {
+    name: 'TESTINGBOT_CONNECT_SAMPLE',
+    producer: 'the connect success renderer with verified TestingBot readiness',
+    sample: TESTINGBOT_CONNECT_SAMPLE,
+    render: () => {
+      const state = {
+        version: 1,
+        session: 'adc-testingbot',
+        tenant: 'direct-testingbot',
+        runId: 'run-testingbot',
+        leaseProvider: 'testingbot',
+        platform: 'ios',
+        remoteConfigPath: '/tmp/testingbot.json',
+        remoteConfigHash: 'fixture',
+        connectedAt: '2026-08-03T00:00:00.000Z',
+        updatedAt: '2026-08-03T00:00:00.000Z',
+      } satisfies RemoteConnectionState;
+      const facts = {
+        provider: 'testingbot',
+        service: 'TestingBot',
+        verificationMessage: 'Credentials, device, and uploaded app verified.',
+        device: {
+          status: 'verified',
+          name: 'iPhone 17 Pro',
+          platform: 'ios',
+          osVersion: '26.5',
+        },
+        app: {
+          status: 'verified',
+          name: 'ZuperiOS.ipa',
+          reference: 'tb://app-key',
+          version: '1.0.0',
         },
       } satisfies ConnectVerification;
       return renderConnectSuccess({

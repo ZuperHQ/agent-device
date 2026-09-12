@@ -24,6 +24,33 @@ export function resolveLeaseValue<T>(
   return typeof value === 'function' ? (value as (lease: DeviceLease) => T)(lease) : value;
 }
 
+/**
+ * POSTs an app binary as a multipart `file` part.
+ *
+ * Shared because the upload itself is the same everywhere — read, wrap, post, honour the abort —
+ * and only the endpoint, auth header, and response shape are the provider's. An upload is not a
+ * billed resource, so the request's cancellation may abort it, unlike the session it precedes.
+ */
+export async function postProviderAppUpload(options: {
+  appPath: string;
+  endpoint: string | URL;
+  headers: Record<string, string>;
+  signal?: AbortSignal;
+}): Promise<Response> {
+  options.signal?.throwIfAborted();
+  const { default: fs } = await import('node:fs/promises');
+  const { default: path } = await import('node:path');
+  const file = await fs.readFile(options.appPath);
+  const form = new FormData();
+  form.set('file', new Blob([file]), path.basename(options.appPath));
+  return await fetch(options.endpoint, {
+    method: 'POST',
+    headers: options.headers,
+    body: form,
+    signal: options.signal,
+  });
+}
+
 export function basicAuthHeader(credentials: { username: string; accessKey: string }): string {
   return `Basic ${Buffer.from(`${credentials.username}:${credentials.accessKey}`).toString('base64')}`;
 }

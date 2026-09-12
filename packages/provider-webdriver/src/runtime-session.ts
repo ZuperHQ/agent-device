@@ -194,7 +194,9 @@ export class WebDriverSessionManager {
       const failure = isWebDriverRequestTimeout(error)
         ? sessionCreateTimeoutError(error, this.options.provider, lease, prepared)
         : error;
-      await releaseOnFailure(failure, () => prepared.cleanup?.());
+      await releaseOnFailure(failure, () =>
+        prepared.cleanup?.({ providerSessionId: prepared.providerSessionId }),
+      );
       throw failure;
     }
   }
@@ -258,7 +260,10 @@ export class WebDriverSessionManager {
       });
     }
     try {
-      cleanup = await session.prepared.cleanup?.();
+      cleanup = await session.prepared.cleanup?.({
+        webDriverSessionId: session.webDriverSessionId,
+        providerSessionId: session.providerSessionId,
+      });
     } catch (error) {
       warnings.push({ code: 'PROVIDER_CLEANUP_FAILED', message: errorMessage(error) });
     }

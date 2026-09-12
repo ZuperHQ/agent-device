@@ -8,20 +8,27 @@ import {
   rejectUnsupportedProviderFeatures,
 } from './provider-feature-support.ts';
 
-const DEVICE_FEATURE_FIELDS = [
-  'providerDeviceOrientation',
-  'providerGeoLocation',
-  'providerTimezone',
-  'providerLanguage',
-  'providerLocale',
-  'providerNetworkProfile',
-  'providerCustomNetwork',
-  'providerNoResignApp',
-] as const;
-
-test('BrowserStack accepts every device-feature flag and AWS Device Farm accepts none', () => {
-  for (const field of DEVICE_FEATURE_FIELDS) {
+test('TestingBot accepts every device-feature flag BrowserStack accepts', () => {
+  for (const field of [
+    'providerDeviceOrientation',
+    'providerGeoLocation',
+    'providerTimezone',
+    'providerLanguage',
+    'providerLocale',
+    'providerNetworkProfile',
+    'providerCustomNetwork',
+    'providerNoResignApp',
+  ] as const) {
     assert.equal(providerSupportsFeature(CLOUD_WEBDRIVER_PROVIDERS.browserStack, field), true);
+    assert.equal(providerSupportsFeature(CLOUD_WEBDRIVER_PROVIDERS.testingBot, field), true);
+    assert.equal(providerSupportsFeature(CLOUD_WEBDRIVER_PROVIDERS.awsDeviceFarm, field), false);
+  }
+});
+
+test('the TestingBot-only session flags are rejected for the other providers', () => {
+  for (const field of ['providerMaxDuration', 'providerTabletOnly'] as const) {
+    assert.equal(providerSupportsFeature(CLOUD_WEBDRIVER_PROVIDERS.testingBot, field), true);
+    assert.equal(providerSupportsFeature(CLOUD_WEBDRIVER_PROVIDERS.browserStack, field), false);
     assert.equal(providerSupportsFeature(CLOUD_WEBDRIVER_PROVIDERS.awsDeviceFarm, field), false);
   }
 });
@@ -29,8 +36,8 @@ test('BrowserStack accepts every device-feature flag and AWS Device Farm accepts
 test('a supported flag passes the rejection unchanged', () => {
   assert.doesNotThrow(() =>
     rejectUnsupportedProviderFeatures(
-      { providerTimezone: 'Europe/Brussels' },
-      CLOUD_WEBDRIVER_PROVIDERS.browserStack,
+      { providerTimezone: 'Europe/Brussels', providerTabletOnly: true },
+      CLOUD_WEBDRIVER_PROVIDERS.testingBot,
     ),
   );
 });
@@ -49,13 +56,27 @@ test('an unsupported flag names every offending flag and a provider that accepts
         error.message,
         /--provider-device-orientation, --provider-timezone are not supported by aws-device-farm/,
       );
-      // The hint names a provider that accepts the whole set, so it stays correct as providers
-      // are added rather than pinning one vendor's name into the message.
+      // Both providers accept BOTH flags, so both are offered as a recovery.
       assert.match(String(error.details?.hint), /browserstack/);
-      assert.deepEqual(error.details?.flags, [
-        '--provider-device-orientation',
-        '--provider-timezone',
-      ]);
+      assert.match(String(error.details?.hint), /testingbot/);
+      return true;
+    },
+  );
+});
+
+test('the recovery hint offers only providers that accept every rejected flag', () => {
+  assert.throws(
+    () =>
+      rejectUnsupportedProviderFeatures(
+        { providerTimezone: 'New_York', providerTabletOnly: true },
+        CLOUD_WEBDRIVER_PROVIDERS.awsDeviceFarm,
+      ),
+    (error: unknown) => {
+      assert.ok(error instanceof AppError);
+      // BrowserStack takes the timezone but not --provider-tablet-only, so naming it would send
+      // the caller to a connect that fails on the second flag.
+      assert.doesNotMatch(String(error.details?.hint), /browserstack/);
+      assert.match(String(error.details?.hint), /testingbot/);
       return true;
     },
   );
@@ -64,7 +85,7 @@ test('an unsupported flag names every offending flag and a provider that accepts
 test('an unset or false flag is not treated as configured', () => {
   assert.doesNotThrow(() =>
     rejectUnsupportedProviderFeatures(
-      { providerTimezone: '', providerNoResignApp: undefined },
+      { providerTimezone: '', providerTabletOnly: false, providerNoResignApp: undefined },
       CLOUD_WEBDRIVER_PROVIDERS.awsDeviceFarm,
     ),
   );
@@ -75,6 +96,8 @@ test('feature fields are read off an untyped daemon request flag bag', () => {
     providerDeviceOrientation: 'landscape',
     providerTimezone: 'New_York',
     providerNoResignApp: true,
+    providerMaxDuration: '7200',
+    providerTabletOnly: true,
     unrelatedFlag: 'ignored',
   });
 
@@ -82,6 +105,8 @@ test('feature fields are read off an untyped daemon request flag bag', () => {
     providerDeviceOrientation: 'landscape',
     providerTimezone: 'New_York',
     providerNoResignApp: true,
+    providerMaxDuration: '7200',
+    providerTabletOnly: true,
   });
 });
 
@@ -103,6 +128,7 @@ test('empty and wrongly-typed flag values are treated as unset', () => {
       providerTimezone: '',
       providerGeoLocation: 42,
       providerNoResignApp: 'yes',
+      providerTabletOnly: 'true',
     }),
     {},
   );

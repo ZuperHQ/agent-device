@@ -468,6 +468,8 @@ function buildClientConfig(ctx: CliRunContext): AgentDeviceClientConfig {
     providerNetworkProfile: currentFlags.providerNetworkProfile,
     providerCustomNetwork: currentFlags.providerCustomNetwork,
     providerNoResignApp: currentFlags.providerNoResignApp,
+    providerMaxDuration: currentFlags.providerMaxDuration,
+    providerTabletOnly: currentFlags.providerTabletOnly,
     awsProjectArn: currentFlags.awsProjectArn,
     awsDeviceArn: currentFlags.awsDeviceArn,
     awsAppArn: currentFlags.awsAppArn,

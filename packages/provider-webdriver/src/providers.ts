@@ -19,6 +19,7 @@ import type { CloudWebDriverCapabilityOverrides } from './capabilities.ts';
 export const CLOUD_WEBDRIVER_PROVIDERS = {
   browserStack: 'browserstack',
   awsDeviceFarm: 'aws-device-farm',
+  testingBot: 'testingbot',
 } as const;
 
 export type CloudWebDriverKnownProviderName =
@@ -54,6 +55,45 @@ export const BROWSERSTACK_CAPABILITY_OVERRIDES = {
     note: 'BrowserStack session details expose provider-hosted video, Appium logs, device logs, and dashboard links.',
   },
 } as const satisfies CloudWebDriverCapabilityOverrides;
+
+// --- TestingBot --------------------------------------------------------------------------------
+
+export const TESTINGBOT_HUB_ENDPOINT = 'https://hub.testingbot.com/wd/hub/';
+export const TESTINGBOT_API_ENDPOINT = 'https://api.testingbot.com/v1';
+export const TESTINGBOT_DASHBOARD_TEST_URL = 'https://testingbot.com/members/tests';
+
+/**
+ * TestingBot's defaults assume a scripted test that never pauses. An agent thinks between
+ * commands, so the 130 s idle timeout and Appium's own command timeout would reap a live session
+ * mid-turn; both are raised to 10 minutes.
+ */
+export const TESTINGBOT_IDLE_TIMEOUT_SECONDS = 600;
+export const TESTINGBOT_NEW_COMMAND_TIMEOUT_SECONDS = 600;
+/** TestingBot defaults `maxduration` to 1800 s, which is short for an agent session. */
+export const TESTINGBOT_DEFAULT_MAX_DURATION_SECONDS = 7200;
+
+export const TESTINGBOT_CAPABILITY_OVERRIDES = {
+  install: {
+    support: 'partial',
+    note: 'Local app artifacts are uploaded to TestingBot Storage, then installed with Appium.',
+  },
+  portReverse: {
+    support: 'unsupported',
+    note: 'Use TestingBot Tunnel for network tunneling; agent-device port reverse is not available.',
+  },
+  artifacts: {
+    support: 'supported',
+    note: 'TestingBot session assets expose provider-hosted video, Appium logs, screenshots, and dashboard links.',
+  },
+} as const satisfies CloudWebDriverCapabilityOverrides;
+
+/** Credentials and endpoint for one TestingBot REST call. */
+export type TestingBotApiOptions = {
+  clientVersion: string;
+  key: string;
+  secret: string;
+  endpoint?: string | URL;
+};
 
 // --- AWS Device Farm ---------------------------------------------------------------------------
 
@@ -102,11 +142,14 @@ export const PROVIDER_FEATURE_SPECS = [
   },
   { field: 'providerGeoLocation', flag: '--provider-geo-location', kind: 'string' },
   { field: 'providerTimezone', flag: '--provider-timezone', kind: 'string' },
+  { field: 'providerAppiumVersion', flag: '--provider-appium-version', kind: 'string' },
   { field: 'providerLanguage', flag: '--provider-language', kind: 'string' },
   { field: 'providerLocale', flag: '--provider-locale', kind: 'string' },
   { field: 'providerNetworkProfile', flag: '--provider-network-profile', kind: 'string' },
   { field: 'providerCustomNetwork', flag: '--provider-custom-network', kind: 'string' },
   { field: 'providerNoResignApp', flag: '--provider-no-resign-app', kind: 'boolean' },
+  { field: 'providerMaxDuration', flag: '--provider-max-duration', kind: 'string' },
+  { field: 'providerTabletOnly', flag: '--provider-tablet-only', kind: 'boolean' },
 ] as const satisfies readonly ProviderFeatureSpecShape[];
 
 type ProviderFeatureSpec = (typeof PROVIDER_FEATURE_SPECS)[number];
@@ -122,11 +165,25 @@ const PROVIDER_FEATURE_SUPPORT = {
     'providerDeviceOrientation',
     'providerGeoLocation',
     'providerTimezone',
+    'providerAppiumVersion',
     'providerLanguage',
     'providerLocale',
     'providerNetworkProfile',
     'providerCustomNetwork',
     'providerNoResignApp',
+  ],
+  [CLOUD_WEBDRIVER_PROVIDERS.testingBot]: [
+    'providerDeviceOrientation',
+    'providerGeoLocation',
+    'providerTimezone',
+    'providerAppiumVersion',
+    'providerLanguage',
+    'providerLocale',
+    'providerNetworkProfile',
+    'providerCustomNetwork',
+    'providerNoResignApp',
+    'providerMaxDuration',
+    'providerTabletOnly',
   ],
   // Remote-access sessions expose no session-creation capabilities of their own.
   [CLOUD_WEBDRIVER_PROVIDERS.awsDeviceFarm]: [],

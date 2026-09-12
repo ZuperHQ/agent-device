@@ -324,6 +324,23 @@
   into a changed pair whose two lines look identical.
 - Fixed: Replay test artifacts with colliding filenames retain distinct copies without overwriting
   other diagnostics, replay sources, timing traces, or attempt manifests.
+- Added: TestingBot as a cloud WebDriver provider. `agent-device connect testingbot --platform ios
+  --device "iPhone 17.*" --provider-os-version "26.*" --provider-app ./App.ipa` verifies
+  `TESTINGBOT_KEY`/`TESTINGBOT_SECRET`, resolves the device selector (exact or regular expression)
+  against the real-device catalogue, and checks the `tb://` upload's platform and simulator-only
+  state before saving a profile; `open` then creates the hosted session. `artifacts` returns the
+  session video, Appium logs, screenshots, and dashboard link, reporting `pending` until TestingBot
+  says its assets are available rather than treating the always-present dashboard link as ready.
+  Sessions pin `realDevice`, raise the 130 s idle and Appium command timeouts to 10 minutes so an
+  agent is not reaped while it thinks, and report their outcome on release so TestingBot does not
+  record them as "unknown". Two new flags: `--provider-max-duration <seconds>` (default 7200) and
+  `--provider-tablet-only`.
+- Changed: the `--provider-*` device-feature flags are now accepted or rejected from a per-provider
+  support table instead of being treated as BrowserStack-only. TestingBot accepts all of them
+  (`--provider-no-resign-app` maps to its `resigningEnabled` opt-out, `--provider-appium-version`
+  to the `tb:options` `appiumVersion` pin); AWS Device Farm still
+  rejects them. A rejection now reads `... are not supported by <provider>` and its hint names
+  every provider that accepts the whole set.
 - Fixed: Custom test reporters reject invalid exit codes, including values such as `256` that
   could wrap to success and hide a failing suite. `getExitCode` accepts integers from `0` to `255`
   or `undefined`; JSON output reports an invalid code as one `INVALID_ARGS` error.

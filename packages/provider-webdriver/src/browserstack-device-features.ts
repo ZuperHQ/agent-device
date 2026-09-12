@@ -1,9 +1,7 @@
 import { PROVIDER_DEVICE_ORIENTATIONS } from '@agent-device/contracts/remote';
 import { type ProviderFeatureFields } from './providers.ts';
-import {
-  rejectConflictingNetworkFields,
-  requireFeaturePlatform,
-} from './provider-feature-support.ts';
+import { rejectConflictingNetworkFields } from './provider-feature-support.ts';
+import { projectDeviceFeatures } from './device-feature-projection.ts';
 import type { CloudWebDriverPlatform } from './runtime.ts';
 
 /**
@@ -122,18 +120,13 @@ export function buildBrowserStackDeviceFeatureCapabilities(
 ): Record<string, unknown> {
   rejectConflictingNetworkFields(fields, 'BrowserStack');
   const capabilities: Record<string, unknown> = {};
-  for (const spec of BROWSERSTACK_DEVICE_FEATURE_SPECS) {
-    const value = fields[spec.field];
-    if (value === undefined || value === false || value === '') continue;
-    if (spec.platform) {
-      requireFeaturePlatform({
-        flag: spec.flag,
-        capability: spec.capability,
-        supported: spec.platform,
-        platform,
-      });
-    }
-    capabilities[spec.capability] = spec.type === 'negated-boolean' ? false : value;
-  }
+  projectDeviceFeatures({
+    specs: BROWSERSTACK_DEVICE_FEATURE_SPECS,
+    fields,
+    platform,
+    emit: (spec, value) => {
+      capabilities[spec.capability] = spec.type === 'negated-boolean' ? false : value;
+    },
+  });
   return capabilities;
 }

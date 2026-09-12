@@ -56,39 +56,40 @@ beforeEach(() => {
       message: 'Run apps to choose an uploaded asset before allocation.',
     },
   });
-  mockedVerifyWebDriverConnection.mockImplementation(async (options) =>
-    options.provider === 'browserstack'
-      ? {
-          provider: 'browserstack',
-          service: 'BrowserStack',
-          verificationMessage: 'Credentials, device, and uploaded app verified.',
-          device: {
-            status: 'verified',
-            name: options.deviceName,
-            platform: options.platform,
-            osVersion: options.osVersion,
-          },
-          app: { status: 'verified', reference: options.app },
-        }
-      : {
-          provider: 'aws-device-farm',
-          service: 'AWS Device Farm',
-          verificationMessage: 'Credentials, project, and device verified.',
-          project: { name: 'Agent Device', reference: options.projectArn },
-          device: {
-            status: 'verified',
-            name: 'iPhone 15',
-            reference: options.deviceArn,
-            platform: options.platform,
-            osVersion: '17',
-          },
-          app: {
-            status: 'missing',
-            message:
-              'No app upload is attached; AWS Device Farm does not support install after allocation.',
-          },
-        },
-  );
+  mockedVerifyWebDriverConnection.mockImplementation(async (options) => {
+    if (options.provider === 'browserstack') {
+      return {
+        provider: 'browserstack',
+        service: 'BrowserStack',
+        ...verifiedDeviceAndApp(options),
+      };
+    }
+    if (options.provider === 'testingbot') {
+      return {
+        provider: 'testingbot',
+        service: 'TestingBot',
+        ...verifiedDeviceAndApp(options),
+      };
+    }
+    return {
+      provider: 'aws-device-farm',
+      service: 'AWS Device Farm',
+      verificationMessage: 'Credentials, project, and device verified.',
+      project: { name: 'Agent Device', reference: options.projectArn },
+      device: {
+        status: 'verified',
+        name: 'iPhone 15',
+        reference: options.deviceArn,
+        platform: options.platform,
+        osVersion: '17',
+      },
+      app: {
+        status: 'missing',
+        message:
+          'No app upload is attached; AWS Device Farm does not support install after allocation.',
+      },
+    };
+  });
 });
 
 test('connect without remote config generates one from cloud connection profile', async () => {
@@ -762,9 +763,10 @@ test('connect aws-device-farm rejects device-feature flags it cannot act on', ()
         // the caller is told what is unsupported rather than what else is missing.
         assert.match(error.message, /--provider-device-orientation, --provider-timezone/);
         assert.match(error.message, /are not supported by aws-device-farm/);
-        // The hint names a provider that accepts the whole set rather than pinning one vendor's
-        // name into the message, so it stays correct as providers are added.
+        // The recovery hint names every provider that accepts ALL the rejected flags, so it stays
+        // actionable as providers are added rather than pinning one vendor's name into the message.
         assert.match(String(error.details?.hint), /browserstack/);
+        assert.match(String(error.details?.hint), /testingbot/);
         assert.deepEqual(error.details?.flags, [
           '--provider-device-orientation',
           '--provider-timezone',
@@ -897,6 +899,25 @@ function readGeneratedConfig(configPath: string): {
     awsAppArn?: string;
     awsRegion?: string;
     awsInteractionMode?: string;
+  };
+}
+
+/** The device/app half of a verified credential-plus-device-plus-app provider verification. */
+function verifiedDeviceAndApp(options: {
+  deviceName: string;
+  platform: 'android' | 'ios';
+  osVersion: string;
+  app: string;
+}) {
+  return {
+    verificationMessage: 'Credentials, device, and uploaded app verified.',
+    device: {
+      status: 'verified' as const,
+      name: options.deviceName,
+      platform: options.platform,
+      osVersion: options.osVersion,
+    },
+    app: { status: 'verified' as const, reference: options.app },
   };
 }
 
