@@ -1,9 +1,9 @@
 import {
   CLOUD_WEBDRIVER_PROVIDERS,
   readAwsDeviceFarmRegionFromArn,
-  rejectBrowserStackOnlyDeviceFeatures,
   type CloudWebDriverKnownProviderName,
 } from '@agent-device/provider-webdriver';
+import { rejectUnsupportedProviderFeatures } from '@agent-device/provider-webdriver/provider-feature-support';
 import type { RemoteConfigProfile } from '../../remote/remote-config-schema.ts';
 import { AppError } from '@agent-device/kernel/errors';
 import type { PlatformSelector } from '@agent-device/kernel/device';
@@ -87,6 +87,7 @@ function browserStackProfileFields(options: {
   env?: EnvMap;
   cwd: string;
 }): RemoteConfigProfile {
+  rejectUnsupportedProviderFeatures(options.flags, CLOUD_WEBDRIVER_PROVIDERS.browserStack);
   requireEnv(options.env, 'BROWSERSTACK_USERNAME', 'connect browserstack');
   requireEnv(options.env, 'BROWSERSTACK_ACCESS_KEY', 'connect browserstack');
   const platform = requireCloudWebDriverPlatform(
@@ -136,7 +137,7 @@ function awsDeviceFarmProfileFields(options: {
   env?: EnvMap;
 }): RemoteConfigProfile {
   const { env, flags } = options;
-  rejectBrowserStackOnlyDeviceFeatures(flags, CLOUD_WEBDRIVER_PROVIDERS.awsDeviceFarm);
+  rejectUnsupportedProviderFeatures(flags, CLOUD_WEBDRIVER_PROVIDERS.awsDeviceFarm);
   const platform = requireCloudWebDriverPlatform(
     flags.platform,
     'connect aws-device-farm requires --platform ios|android.',

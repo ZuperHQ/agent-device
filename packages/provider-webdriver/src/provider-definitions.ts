@@ -5,26 +5,20 @@ import type { LeaseLifecycleContext } from '@agent-device/contracts/device';
 import { AppError } from '@agent-device/kernel/errors';
 import type { ProviderWebDriverDependencies } from './dependencies.ts';
 import {
-  AWS_DEVICE_FARM_CAPABILITY_OVERRIDES,
   createAwsCliDeviceFarmClient,
   createAwsDeviceFarmPrepareSession,
   listAwsDeviceFarmCloudArtifacts,
 } from './aws-device-farm.ts';
+// Provider vocabulary plus everything static keyed by it: endpoints, capability maps, and the
+// device-feature support table. The adapters themselves load on the request path (ADR 0019).
 import {
+  AWS_DEVICE_FARM_CAPABILITY_OVERRIDES,
   BROWSERSTACK_APP_AUTOMATE_ENDPOINT,
   BROWSERSTACK_APP_UPLOAD_ENDPOINT,
   BROWSERSTACK_CAPABILITY_OVERRIDES,
-  buildBrowserStackCapabilities,
-  createBrowserStackUploadApp,
-  listBrowserStackCloudArtifacts,
-  uploadBrowserStackApp,
-} from './browserstack.ts';
-import {
-  buildBrowserStackDeviceFeatureCapabilities,
-  readBrowserStackDeviceFeatureFields,
-  rejectBrowserStackOnlyDeviceFeatures,
-} from './browserstack-device-features.ts';
-import { CLOUD_WEBDRIVER_PROVIDERS, type CloudWebDriverKnownProviderName } from './providers.ts';
+  CLOUD_WEBDRIVER_PROVIDERS,
+  type CloudWebDriverKnownProviderName,
+} from './providers.ts';
 import { readAwsDeviceFarmRegionFromArn } from './connection-verification.ts';
 import {
   buildCloudWebDriverBaseCapabilities,
@@ -76,6 +70,7 @@ export function createCloudWebDriverProviderDefinitions(
           endpoint: env.BROWSERSTACK_WEBDRIVER_ENDPOINT ?? BROWSERSTACK_APP_AUTOMATE_ENDPOINT,
           capabilityOverrides: BROWSERSTACK_CAPABILITY_OVERRIDES,
           listArtifacts: async ({ provider, providerSessionId }) => {
+            const { listBrowserStackCloudArtifacts } = await import('./browserstack.ts');
             const username = requireEnv(
               env,
               'BROWSERSTACK_USERNAME',
@@ -95,6 +90,16 @@ export function createCloudWebDriverProviderDefinitions(
           },
           prepareSession: async ({ req, lease, base }) => {
             const request = requireRequest(req, 'BrowserStack');
+            const { readProviderFeatureFields, rejectUnsupportedProviderFeatures } =
+              await import('./provider-feature-support.ts');
+            rejectUnsupportedProviderFeatures(
+              request.flags,
+              CLOUD_WEBDRIVER_PROVIDERS.browserStack,
+            );
+            const { buildBrowserStackCapabilities, createBrowserStackUploadApp } =
+              await import('./browserstack.ts');
+            const { buildBrowserStackDeviceFeatureCapabilities } =
+              await import('./browserstack-device-features.ts');
             const username = requireEnv(env, 'BROWSERSTACK_USERNAME', 'BrowserStack');
             const accessKey = requireEnv(env, 'BROWSERSTACK_ACCESS_KEY', 'BrowserStack');
             const platform = requireRequestPlatform(request, 'BrowserStack');
@@ -143,7 +148,7 @@ export function createCloudWebDriverProviderDefinitions(
                 buildName: readFlag(request, 'providerBuild') ?? lease.runId,
                 sessionName: readFlag(request, 'providerSessionName') ?? lease.leaseId,
                 deviceFeatures: buildBrowserStackDeviceFeatureCapabilities(
-                  readBrowserStackDeviceFeatureFields(request.flags),
+                  readProviderFeatureFields(request.flags),
                   platform,
                 ),
                 configured: buildCloudWebDriverBaseCapabilities(platform, deviceName),
@@ -152,6 +157,7 @@ export function createCloudWebDriverProviderDefinitions(
           },
         }),
       listArtifactsFromEnv: async (providerSessionId, env) => {
+        const { listBrowserStackCloudArtifacts } = await import('./browserstack.ts');
         const username = requireEnv(env, 'BROWSERSTACK_USERNAME', 'BrowserStack artifact lookup');
         const accessKey = requireEnv(
           env,
@@ -195,7 +201,9 @@ export function createCloudWebDriverProviderDefinitions(
             // Enforced here, not only in the CLI profile builder: the typed client and
             // hand-authored remote-config profiles both reach session preparation without passing
             // through `connect`, and would otherwise have these capabilities silently dropped.
-            rejectBrowserStackOnlyDeviceFeatures(
+            const { rejectUnsupportedProviderFeatures } =
+              await import('./provider-feature-support.ts');
+            rejectUnsupportedProviderFeatures(
               request.flags,
               CLOUD_WEBDRIVER_PROVIDERS.awsDeviceFarm,
             );
@@ -267,6 +275,7 @@ async function resolveBrowserStackAppReference(options: {
       { providerApp: options.app },
     );
   }
+  const { uploadBrowserStackApp } = await import('./browserstack.ts');
   return await uploadBrowserStackApp(
     appPath,
     {
