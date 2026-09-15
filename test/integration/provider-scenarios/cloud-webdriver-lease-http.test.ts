@@ -107,6 +107,7 @@ test('lease_allocate over HTTP prepares the BrowserStack session end to end', as
       assert.deepEqual(alwaysMatch(create), {
         platformName: 'Android',
         'appium:deviceName': 'Google Pixel 8',
+        'appium:newCommandTimeout': 600,
         'appium:platformVersion': '14.0',
         'appium:app': 'bs://preuploaded',
         'bstack:options': {

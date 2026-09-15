@@ -480,6 +480,7 @@ function assertWebDriverCalls(calls: readonly CloudWebDriverHttpCall[], leaseId:
       alwaysMatch: {
         platformName: 'Android',
         'appium:deviceName': 'Google Pixel 8',
+        'appium:newCommandTimeout': 600,
         'appium:platformVersion': '14.0',
         'appium:app': 'bs://app-id',
         'bstack:options': {
