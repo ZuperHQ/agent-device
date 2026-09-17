@@ -99,6 +99,51 @@ test('cloud artifact lookup does not accept a provider session id without its le
   }
 });
 
+// A provider whose session id is minted by the hub (TestingBot) can only learn it at cleanup, so
+// release hands the ids to the callback. A cleanup that ignores the argument — BrowserStack's and
+// AWS's, which already own their provider-side handle — must be unaffected by that.
+test('release hands the session ids to cleanup, and an arity-zero cleanup still runs', async () => {
+  const seen: unknown[] = [];
+  let ignoredArgumentCleanupRan = false;
+  globalThis.fetch = async () => jsonResponse({ value: { sessionId: 'wd-1', capabilities: {} } });
+  const runtime = makeRuntime({
+    prepareSession: async ({ base }) => ({
+      ...base,
+      cleanup: async (context) => {
+        seen.push(context);
+        return undefined;
+      },
+    }),
+  });
+  const ignoringRuntime = makeRuntime({
+    provider: 'webdriver-ignores-context',
+    prepareSession: async ({ base }) => ({
+      ...base,
+      // Exactly the shape BrowserStack and AWS use: no parameter at all.
+      cleanup: async () => {
+        ignoredArgumentCleanupRan = true;
+        return { providerHandle: 'owned-before-the-session-existed' };
+      },
+    }),
+  });
+
+  try {
+    const lease = makeLease();
+    await runtime.leaseLifecycle.allocate!(lease);
+    await runtime.leaseLifecycle.release!(lease);
+    assert.deepEqual(seen, [{ webDriverSessionId: 'wd-1', providerSessionId: 'wd-1' }]);
+
+    const ignoringLease = { ...makeLease(), leaseProvider: 'webdriver-ignores-context' };
+    await ignoringRuntime.leaseLifecycle.allocate!(ignoringLease);
+    const release = await ignoringRuntime.leaseLifecycle.release!(ignoringLease);
+    assert.equal(ignoredArgumentCleanupRan, true);
+    assert.equal(release?.providerHandle, 'owned-before-the-session-existed');
+  } finally {
+    await runtime.shutdown();
+    await ignoringRuntime.shutdown();
+  }
+});
+
 function makeRuntime(overrides: Partial<CloudWebDriverRuntimeOptions> = {}) {
   return createCloudWebDriverRuntime({
     clientVersion: 'test',

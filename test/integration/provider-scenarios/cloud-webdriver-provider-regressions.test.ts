@@ -216,6 +216,7 @@ test('AWS Device Farm sends the requested platform in WebDriver capabilities', a
           alwaysMatch: {
             platformName: 'iOS',
             'appium:deviceName': 'Apple iPhone 13',
+            'appium:newCommandTimeout': 600,
           },
         },
       });

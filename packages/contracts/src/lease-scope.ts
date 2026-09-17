@@ -225,6 +225,8 @@ const LEASE_ALLOCATE_PROVIDER_FLAG_KEYS = [
   'providerNetworkProfile',
   'providerCustomNetwork',
   'providerNoResignApp',
+  'providerMaxDuration',
+  'providerTabletOnly',
   'awsProjectArn',
   'awsDeviceArn',
   'awsAppArn',

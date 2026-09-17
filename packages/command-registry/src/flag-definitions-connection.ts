@@ -289,6 +289,28 @@ export const CONNECTION_FLAG_DEFINITIONS: readonly FlagDefinition[] = [
     recorded: false,
   },
   {
+    // Seconds, declared as a string rather than an int: it crosses the compact lease envelope,
+    // whose projection forwards strings and booleans only, and the provider parses and bounds it.
+    key: 'providerMaxDuration',
+    names: ['--provider-max-duration'],
+    type: 'string',
+    usageLabel: '--provider-max-duration <seconds>',
+    usageDescription:
+      'Hosted cloud provider maximum session duration in seconds, for example 7200. Raise it when an agent session outlives the provider default',
+    projectConfig: false,
+    recorded: false,
+  },
+  {
+    key: 'providerTabletOnly',
+    names: ['--provider-tablet-only'],
+    type: 'boolean',
+    usageLabel: '--provider-tablet-only',
+    usageDescription:
+      'Restrict hosted cloud provider device allocation to tablets, for example with --device "iPad.*"',
+    projectConfig: false,
+    recorded: false,
+  },
+  {
     key: 'awsProjectArn',
     names: ['--aws-project-arn'],
     type: 'string',

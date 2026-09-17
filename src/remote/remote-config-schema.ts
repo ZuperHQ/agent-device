@@ -94,6 +94,8 @@ export const REMOTE_CONFIG_FIELD_SPECS = [
   { key: 'providerNetworkProfile', type: 'string' },
   { key: 'providerCustomNetwork', type: 'string' },
   { key: 'providerNoResignApp', type: 'boolean' },
+  { key: 'providerMaxDuration', type: 'string' },
+  { key: 'providerTabletOnly', type: 'boolean' },
   { key: 'awsProjectArn', type: 'string' },
   { key: 'awsDeviceArn', type: 'string' },
   { key: 'awsAppArn', type: 'string' },

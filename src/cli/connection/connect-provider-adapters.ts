@@ -64,6 +64,11 @@ const CONNECT_PROVIDER_ADAPTERS = {
       resolveCloudWebDriverConnectProfile({ provider: 'browserstack', ...context }),
     verify: verifyBrowserStack,
   },
+  testingbot: {
+    resolve: (context) =>
+      resolveCloudWebDriverConnectProfile({ provider: 'testingbot', ...context }),
+    verify: verifyTestingBot,
+  },
   'aws-device-farm': {
     resolve: (context) =>
       resolveCloudWebDriverConnectProfile({ provider: 'aws-device-farm', ...context }),
@@ -150,6 +155,30 @@ async function verifyBrowserStack(
       'BrowserStack profile missed OS version.',
     ),
     app: requiredResolvedValue(flags.providerApp, 'BrowserStack profile missed app.'),
+  });
+}
+
+async function verifyTestingBot(
+  context: Pick<AdapterContext, 'flags' | 'env'>,
+): Promise<ConnectVerification> {
+  const { flags, env } = context;
+  return await providerWebDriver.verifyConnection({
+    provider: 'testingbot',
+    key: requiredResolvedValue(
+      env.TESTINGBOT_KEY ?? env.TB_KEY,
+      'TestingBot profile missed TESTINGBOT_KEY.',
+    ),
+    secret: requiredResolvedValue(
+      env.TESTINGBOT_SECRET ?? env.TB_SECRET,
+      'TestingBot profile missed TESTINGBOT_SECRET.',
+    ),
+    platform: requiredResolvedPlatform(flags.platform, 'TestingBot'),
+    deviceName: requiredResolvedValue(flags.device, 'TestingBot profile missed device.'),
+    osVersion: requiredResolvedValue(
+      flags.providerOsVersion,
+      'TestingBot profile missed OS version.',
+    ),
+    app: requiredResolvedValue(flags.providerApp, 'TestingBot profile missed app.'),
   });
 }
 

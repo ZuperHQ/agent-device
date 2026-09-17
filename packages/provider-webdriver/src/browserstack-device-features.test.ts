@@ -5,12 +5,11 @@ import { AppError } from '@agent-device/kernel/errors';
 import {
   BROWSERSTACK_DEVICE_FEATURE_SPECS,
   buildBrowserStackDeviceFeatureCapabilities,
-  readBrowserStackDeviceFeatureFields,
 } from './browserstack-device-features.ts';
 
-// Every device-feature field must own a spec row: a field the table forgets parses off the CLI,
-// rides the profile, and is then silently dropped before the hub ever sees it.
-const DEVICE_FEATURE_FIELDS = [
+// Every device-feature field BrowserStack supports must own a spec row: a field the table forgets
+// parses off the CLI, rides the profile, and is then silently dropped before the hub ever sees it.
+const BROWSERSTACK_DEVICE_FEATURE_FIELDS = [
   'providerDeviceOrientation',
   'providerGeoLocation',
   'providerTimezone',
@@ -22,9 +21,9 @@ const DEVICE_FEATURE_FIELDS = [
   'providerNoResignApp',
 ] as const;
 
-test('every device-feature field maps to exactly one capability spec', () => {
+test('every supported device-feature field maps to exactly one capability spec', () => {
   const fields = BROWSERSTACK_DEVICE_FEATURE_SPECS.map((spec) => spec.field);
-  assert.deepEqual([...fields].sort(), [...DEVICE_FEATURE_FIELDS].sort());
+  assert.deepEqual([...fields].sort(), [...BROWSERSTACK_DEVICE_FEATURE_FIELDS].sort());
   const capabilities = BROWSERSTACK_DEVICE_FEATURE_SPECS.map((spec) => spec.capability);
   assert.equal(new Set(capabilities).size, capabilities.length);
 });
@@ -84,46 +83,9 @@ test('a named network profile and a custom network shape cannot both be configur
     (error: unknown) => {
       assert.ok(error instanceof AppError);
       assert.equal(error.code, 'INVALID_ARGS');
+      assert.match(error.message, /BrowserStack accepts either/);
       assert.match(String(error.details?.hint), /only one of/);
       return true;
     },
-  );
-});
-
-test('device-feature flags are read off an untyped daemon request flag bag', () => {
-  const fields = readBrowserStackDeviceFeatureFields({
-    providerDeviceOrientation: 'landscape',
-    providerTimezone: 'New_York',
-    providerNoResignApp: true,
-    unrelatedFlag: 'ignored',
-  });
-
-  assert.deepEqual(fields, {
-    providerDeviceOrientation: 'landscape',
-    providerTimezone: 'New_York',
-    providerNoResignApp: true,
-  });
-});
-
-test('an unrecognized orientation is rejected at the flag boundary, not forwarded to the hub', () => {
-  assert.throws(
-    () => readBrowserStackDeviceFeatureFields({ providerDeviceOrientation: 'landscape-left' }),
-    (error: unknown) => {
-      assert.ok(error instanceof AppError);
-      assert.equal(error.code, 'INVALID_ARGS');
-      assert.match(String(error.details?.hint), /portrait\|landscape/);
-      return true;
-    },
-  );
-});
-
-test('empty and non-string flag values are treated as unset', () => {
-  assert.deepEqual(
-    readBrowserStackDeviceFeatureFields({
-      providerTimezone: '',
-      providerGeoLocation: 42,
-      providerNoResignApp: 'yes',
-    }),
-    {},
   );
 });

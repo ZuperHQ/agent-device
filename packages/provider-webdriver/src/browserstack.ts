@@ -1,9 +1,6 @@
-import fs from 'node:fs/promises';
-import path from 'node:path';
 import type { CloudArtifact, CloudArtifactsResult } from '@agent-device/contracts/observability';
 import {
   createCloudWebDriverCapabilities,
-  type CloudWebDriverCapabilityOverrides,
   type CloudWebDriverProviderCapabilities,
 } from './capabilities.ts';
 import {
@@ -14,7 +11,13 @@ import {
 } from './runtime.ts';
 import type { DeviceLease, ProviderDeviceRuntime } from '@agent-device/contracts/device';
 import { AppError } from '@agent-device/kernel/errors';
-import { CLOUD_WEBDRIVER_PROVIDERS } from './providers.ts';
+import {
+  BROWSERSTACK_APP_AUTOMATE_ENDPOINT,
+  BROWSERSTACK_APP_UPLOAD_ENDPOINT,
+  BROWSERSTACK_CAPABILITY_OVERRIDES,
+  BROWSERSTACK_SESSION_DETAILS_ENDPOINT,
+  CLOUD_WEBDRIVER_PROVIDERS,
+} from './providers.ts';
 import {
   buildBrowserStackDeviceFeatureCapabilities,
   type BrowserStackDeviceFeatureFields,
@@ -23,31 +26,16 @@ import { agentDeviceRequestHeaders } from './request-headers.ts';
 import { cloudArtifactsReadyOrPending } from './artifact-results.ts';
 import {
   basicAuthHeader,
+  postProviderAppUpload,
   resolveLeaseValue,
   trimTrailingSlash,
   type LeaseValue,
 } from './webdriver-utils.ts';
 
 const BROWSERSTACK_PROVIDER = CLOUD_WEBDRIVER_PROVIDERS.browserStack;
-export const BROWSERSTACK_APP_AUTOMATE_ENDPOINT = 'https://hub-cloud.browserstack.com/wd/hub/';
-export const BROWSERSTACK_APP_UPLOAD_ENDPOINT =
-  'https://api-cloud.browserstack.com/app-automate/upload';
-const BROWSERSTACK_SESSION_DETAILS_ENDPOINT =
-  'https://api-cloud.browserstack.com/app-automate/sessions';
-export const BROWSERSTACK_CAPABILITY_OVERRIDES = {
-  install: {
-    support: 'partial',
-    note: 'Local app artifacts are uploaded to BrowserStack App Automate, then installed with Appium.',
-  },
-  portReverse: {
-    support: 'unsupported',
-    note: 'Use BrowserStack Local for network tunneling; agent-device port reverse is not available.',
-  },
-  artifacts: {
-    support: 'supported',
-    note: 'BrowserStack session details expose provider-hosted video, Appium logs, device logs, and dashboard links.',
-  },
-} as const satisfies CloudWebDriverCapabilityOverrides;
+
+// Endpoints and the capability map live with the provider vocabulary in `providers.ts`, so
+// composing the registry does not evaluate this adapter.
 
 export type BrowserStackWebDriverRuntimeOptions = {
   clientVersion: string;
@@ -184,17 +172,13 @@ export async function uploadBrowserStackApp(
   options: BrowserStackUploadOptions,
   signal?: AbortSignal,
 ): Promise<string> {
-  signal?.throwIfAborted();
-  const file = await fs.readFile(appPath);
-  const form = new FormData();
-  form.set('file', new Blob([file]), path.basename(appPath));
-  const response = await fetch(options.endpoint ?? BROWSERSTACK_APP_UPLOAD_ENDPOINT, {
-    method: 'POST',
+  const response = await postProviderAppUpload({
+    appPath,
+    endpoint: options.endpoint ?? BROWSERSTACK_APP_UPLOAD_ENDPOINT,
     headers: {
       ...agentDeviceRequestHeaders(options.clientVersion),
       Authorization: basicAuthHeader(options),
     },
-    body: form,
     signal,
   });
   const json = (await response.json()) as unknown;

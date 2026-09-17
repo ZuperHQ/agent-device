@@ -75,6 +75,8 @@ export type AgentDeviceRequestOverrides = Pick<
   | 'providerNetworkProfile'
   | 'providerCustomNetwork'
   | 'providerNoResignApp'
+  | 'providerMaxDuration'
+  | 'providerTabletOnly'
   | 'awsProjectArn'
   | 'awsDeviceArn'
   | 'awsAppArn'

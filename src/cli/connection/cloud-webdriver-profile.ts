@@ -1,9 +1,9 @@
 import {
   CLOUD_WEBDRIVER_PROVIDERS,
   readAwsDeviceFarmRegionFromArn,
-  rejectBrowserStackOnlyDeviceFeatures,
   type CloudWebDriverKnownProviderName,
 } from '@agent-device/provider-webdriver';
+import { rejectUnsupportedProviderFeatures } from '@agent-device/provider-webdriver/provider-feature-support';
 import type { RemoteConfigProfile } from '../../remote/remote-config-schema.ts';
 import { AppError } from '@agent-device/kernel/errors';
 import type { PlatformSelector } from '@agent-device/kernel/device';
@@ -67,6 +67,10 @@ const CLOUD_WEBDRIVER_CONNECT_PROFILE_BUILDERS: readonly {
     buildProfileFields: browserStackProfileFields,
   },
   {
+    provider: CLOUD_WEBDRIVER_PROVIDERS.testingBot,
+    buildProfileFields: testingBotProfileFields,
+  },
+  {
     provider: CLOUD_WEBDRIVER_PROVIDERS.awsDeviceFarm,
     buildProfileFields: awsDeviceFarmProfileFields,
   },
@@ -82,11 +86,57 @@ function requireConnectProfileBuilder(
   throw new AppError('INVALID_ARGS', `Unsupported cloud WebDriver provider "${provider}".`);
 }
 
+function testingBotProfileFields(options: {
+  flags: CliFlags;
+  env?: EnvMap;
+  cwd: string;
+}): RemoteConfigProfile {
+  rejectUnsupportedProviderFeatures(options.flags, CLOUD_WEBDRIVER_PROVIDERS.testingBot);
+  requireTestingBotCredential(options.env, ['TESTINGBOT_KEY', 'TB_KEY']);
+  requireTestingBotCredential(options.env, ['TESTINGBOT_SECRET', 'TB_SECRET']);
+  const platform = requireCloudWebDriverPlatform(
+    options.flags.platform,
+    'connect testingbot requires --platform ios|android.',
+  );
+  return {
+    platform,
+    device: requireFlag(
+      options.flags.device,
+      'connect testingbot requires --device <name-or-regex>.',
+    ),
+    providerOsVersion: requireFlag(
+      options.flags.providerOsVersion,
+      'connect testingbot requires --provider-os-version <version-or-regex>.',
+    ),
+    providerApp: normalizeProviderAppReference(
+      requireFlag(
+        options.flags.providerApp,
+        'connect testingbot requires --provider-app <tb://app-key-or-local-path>.',
+      ),
+      options.cwd,
+      { scheme: 'tb://', service: 'TestingBot' },
+    ),
+    providerBuild: options.flags.providerBuild,
+    providerSessionName: options.flags.providerSessionName,
+    providerMaxDuration: options.flags.providerMaxDuration,
+    providerTabletOnly: options.flags.providerTabletOnly,
+    ...readCloudDeviceFeatureProfileFields(options.flags),
+  };
+}
+
+/** Accepts TestingBot's own `TB_*` names as aliases for the canonical `TESTINGBOT_*` pair. */
+function requireTestingBotCredential(env: EnvMap | undefined, names: readonly string[]): string {
+  const value = names.map((name) => env?.[name]).find((entry): entry is string => Boolean(entry));
+  if (value) return value;
+  throw new AppError('INVALID_ARGS', `connect testingbot requires ${names[0]} in the environment.`);
+}
+
 function browserStackProfileFields(options: {
   flags: CliFlags;
   env?: EnvMap;
   cwd: string;
 }): RemoteConfigProfile {
+  rejectUnsupportedProviderFeatures(options.flags, CLOUD_WEBDRIVER_PROVIDERS.browserStack);
   requireEnv(options.env, 'BROWSERSTACK_USERNAME', 'connect browserstack');
   requireEnv(options.env, 'BROWSERSTACK_ACCESS_KEY', 'connect browserstack');
   const platform = requireCloudWebDriverPlatform(
@@ -121,14 +171,28 @@ function browserStackProfileFields(options: {
 }
 
 function normalizeBrowserStackAppReference(app: string, cwd: string): string {
-  if (app.startsWith('bs://') || /^https?:\/\//i.test(app)) return app;
+  return normalizeProviderAppReference(app, cwd, { scheme: 'bs://', service: 'BrowserStack' });
+}
+
+/**
+ * A provider app reference is its own storage scheme, a public URL, or a local file.
+ *
+ * The local path is resolved and proven to exist here so `connect` fails on a mistyped path rather
+ * than at session creation, when a device may already be allocated.
+ */
+function normalizeProviderAppReference(
+  app: string,
+  cwd: string,
+  provider: { scheme: string; service: string },
+): string {
+  if (app.startsWith(provider.scheme) || /^https?:\/\//i.test(app)) return app;
   const resolvedPath = path.resolve(cwd, app);
   try {
     if (fs.statSync(resolvedPath).isFile()) return resolvedPath;
   } catch {
     // Report one stable profile error below.
   }
-  throw new AppError('INVALID_ARGS', `BrowserStack app file not found: ${resolvedPath}`);
+  throw new AppError('INVALID_ARGS', `${provider.service} app file not found: ${resolvedPath}`);
 }
 
 function awsDeviceFarmProfileFields(options: {
@@ -136,7 +200,7 @@ function awsDeviceFarmProfileFields(options: {
   env?: EnvMap;
 }): RemoteConfigProfile {
   const { env, flags } = options;
-  rejectBrowserStackOnlyDeviceFeatures(flags, CLOUD_WEBDRIVER_PROVIDERS.awsDeviceFarm);
+  rejectUnsupportedProviderFeatures(flags, CLOUD_WEBDRIVER_PROVIDERS.awsDeviceFarm);
   const platform = requireCloudWebDriverPlatform(
     flags.platform,
     'connect aws-device-farm requires --platform ios|android.',

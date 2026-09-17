@@ -32,6 +32,7 @@ export function connectProviderNamesForError(): string {
     'cloud',
     'proxy',
     CLOUD_WEBDRIVER_PROVIDERS.browserStack,
+    CLOUD_WEBDRIVER_PROVIDERS.testingBot,
     CLOUD_WEBDRIVER_PROVIDERS.awsDeviceFarm,
     'limrun',
   ].join(', ');

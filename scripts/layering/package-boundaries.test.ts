@@ -728,6 +728,9 @@ test('the real tree parses, declares, and passes R11', () => {
   assert.ok(providerWebDriverPackage, 'provider-webdriver package must exist');
   assert.deepEqual([...providerWebDriverPackage.exportTargets.keys()].sort(), [
     '@agent-device/provider-webdriver',
+    // The device-feature validators are reachable without the package barrel so the CLI profile
+    // builder can call them without evaluating the provider adapters (ADR 0019 loading shape).
+    '@agent-device/provider-webdriver/provider-feature-support',
     '@agent-device/provider-webdriver/providers',
   ]);
   assert.deepEqual([...providerWebDriverPackage.workspaceDependencies].sort(), [

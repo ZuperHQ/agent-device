@@ -102,5 +102,12 @@ async function requestBody(request: Request): Promise<{ body?: unknown }> {
     return { body: { multipartBytes: buffer.length } };
   }
   const text = buffer.toString('utf8');
-  return text ? { body: JSON.parse(text) as unknown } : {};
+  if (!text) return {};
+  // Not every provider API is JSON: TestingBot's session-status update is form-encoded, and
+  // parsing it as JSON used to throw inside the server, which surfaced as a provider cleanup
+  // failure rather than as the request the assertion was looking for.
+  if (request.headers.get('content-type')?.startsWith('application/x-www-form-urlencoded')) {
+    return { body: Object.fromEntries(new URLSearchParams(text)) };
+  }
+  return { body: JSON.parse(text) as unknown };
 }

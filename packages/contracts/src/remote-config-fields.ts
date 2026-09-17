@@ -35,6 +35,10 @@ export type CloudProviderProfileFields = {
   providerNetworkProfile?: string;
   providerCustomNetwork?: string;
   providerNoResignApp?: boolean;
+  // Seconds, carried as a string: the compact lease envelope is `Record<string, unknown>` and its
+  // projection forwards strings and booleans only, so a number here would be dropped in transit.
+  providerMaxDuration?: string;
+  providerTabletOnly?: boolean;
   awsProjectArn?: string;
   awsDeviceArn?: string;
   awsAppArn?: string;

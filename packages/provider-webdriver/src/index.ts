@@ -8,7 +8,7 @@ import {
   type DefaultCloudWebDriverArtifactEnv,
   type DefaultCloudWebDriverProviderRuntimeEnv,
 } from './provider-definitions.ts';
-import { CLOUD_WEBDRIVER_PROVIDERS, isCloudWebDriverProviderName } from './providers.ts';
+import { CLOUD_WEBDRIVER_PROVIDERS } from './providers.ts';
 import {
   readAwsDeviceFarmRegionFromArn,
   verifyCloudWebDriverConnection,
@@ -17,9 +17,10 @@ import {
 } from './connection-verification.ts';
 import type { CloudWebDriverRuntime } from './runtime.ts';
 
-export { CLOUD_WEBDRIVER_PROVIDERS, isCloudWebDriverProviderName };
+export { CLOUD_WEBDRIVER_PROVIDERS };
+
 export { readAwsDeviceFarmRegionFromArn };
-export { rejectBrowserStackOnlyDeviceFeatures } from './browserstack-device-features.ts';
+
 export type { CloudWebDriverKnownProviderName } from './providers.ts';
 export type { ProviderWebDriverDependencies, RunHostCommand } from './dependencies.ts';
 export type {

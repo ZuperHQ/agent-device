@@ -18,6 +18,10 @@
     "./providers": {
       "types": "./src/providers.ts",
       "default": "./src/providers.ts"
+    },
+    "./provider-feature-support": {
+      "types": "./src/provider-feature-support.ts",
+      "default": "./src/provider-feature-support.ts"
     }
   }
 }

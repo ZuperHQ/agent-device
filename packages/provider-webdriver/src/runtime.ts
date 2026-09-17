@@ -60,12 +60,24 @@ export type CloudWebDriverBaseSession = {
   headers?: Record<string, string>;
 };
 
+/**
+ * Session identity as known when cleanup runs.
+ *
+ * Both ids are absent when session creation itself failed: there is no session to report on, only
+ * provider-side resources to unwind. A provider whose session id is minted by the hub (rather than
+ * created out-of-band before `POST /session`) can only learn it here.
+ */
+export type CloudWebDriverCleanupContext = {
+  webDriverSessionId?: string;
+  providerSessionId?: string;
+};
+
 export type CloudWebDriverPreparedSession = CloudWebDriverBaseSession & {
   deviceId?: string;
   providerSessionId?: string;
   uploadApp?: CloudWebDriverUploadApp;
   listArtifacts?: CloudWebDriverListArtifacts;
-  cleanup?: () => Promise<Record<string, unknown> | undefined>;
+  cleanup?: (context: CloudWebDriverCleanupContext) => Promise<Record<string, unknown> | undefined>;
   providerData?: Record<string, unknown>;
 };
 

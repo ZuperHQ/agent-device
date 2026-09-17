@@ -1,6 +1,5 @@
 import {
   createCloudWebDriverCapabilities,
-  type CloudWebDriverCapabilityOverrides,
   type CloudWebDriverProviderCapabilities,
 } from './capabilities.ts';
 import { buildCloudWebDriverBaseCapabilities, createCloudWebDriverRuntime } from './runtime.ts';
@@ -23,24 +22,12 @@ import type {
 import { setTimeout as sleep } from 'node:timers/promises';
 import { AppError } from '@agent-device/kernel/errors';
 import type { RunHostCommand } from './dependencies.ts';
-import { CLOUD_WEBDRIVER_PROVIDERS } from './providers.ts';
+import { AWS_DEVICE_FARM_CAPABILITY_OVERRIDES, CLOUD_WEBDRIVER_PROVIDERS } from './providers.ts';
 import { releaseOnFailure, resolveLeaseValue, type LeaseValue } from './webdriver-utils.ts';
 
 const AWS_DEVICE_FARM_PROVIDER = CLOUD_WEBDRIVER_PROVIDERS.awsDeviceFarm;
-export const AWS_DEVICE_FARM_CAPABILITY_OVERRIDES = {
-  install: {
-    support: 'unsupported',
-    note: 'Pass appArn when creating the remote access session; local artifact upload/install is not implemented.',
-  },
-  portReverse: {
-    support: 'unsupported',
-    note: 'AWS Device Farm remote access does not expose agent-device port reverse.',
-  },
-  artifacts: {
-    support: 'supported',
-    note: 'AWS Device Farm remote access exposes provider-hosted video, Appium logs, and device logs after session completion.',
-  },
-} as const satisfies CloudWebDriverCapabilityOverrides;
+// The capability map lives with the provider vocabulary in `providers.ts`, so composing the
+// registry does not evaluate this adapter.
 
 export {
   listAwsDeviceFarmCloudArtifacts,

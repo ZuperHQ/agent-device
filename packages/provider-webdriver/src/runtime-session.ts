@@ -194,7 +194,9 @@ export class WebDriverSessionManager {
       const failure = isWebDriverRequestTimeout(error)
         ? sessionCreateTimeoutError(error, this.options.provider, lease, prepared)
         : error;
-      await releaseOnFailure(failure, () => prepared.cleanup?.());
+      await releaseOnFailure(failure, () =>
+        prepared.cleanup?.({ providerSessionId: prepared.providerSessionId }),
+      );
       throw failure;
     }
   }
@@ -258,7 +260,10 @@ export class WebDriverSessionManager {
       });
     }
     try {
-      cleanup = await session.prepared.cleanup?.();
+      cleanup = await session.prepared.cleanup?.({
+        webDriverSessionId: session.webDriverSessionId,
+        providerSessionId: session.providerSessionId,
+      });
     } catch (error) {
       warnings.push({ code: 'PROVIDER_CLEANUP_FAILED', message: errorMessage(error) });
     }
@@ -288,6 +293,18 @@ export class WebDriverSessionManager {
   }
 }
 
+/**
+ * Appium shuts a session down after `newCommandTimeout` seconds without a
+ * command, and the default is 60. That assumes a scripted suite that never
+ * pauses; an agent thinks between commands, and a single `open` averages ~56 s
+ * on a real device, so the default reaps live sessions mid-turn.
+ *
+ * TestingBot and BrowserStack set this in their own capability builders. This
+ * is the shared floor for every cloud that does not, which today means AWS
+ * Device Farm -- its sessions were being created with the 60 s default.
+ */
+const CLOUD_NEW_COMMAND_TIMEOUT_SECONDS = 600;
+
 export function buildCloudWebDriverBaseCapabilities(
   platform: CloudWebDriverPlatform,
   deviceName: string,
@@ -296,6 +313,8 @@ export function buildCloudWebDriverBaseCapabilities(
   return {
     platformName: platform === 'ios' ? 'iOS' : 'Android',
     'appium:deviceName': deviceName,
+    'appium:newCommandTimeout': CLOUD_NEW_COMMAND_TIMEOUT_SECONDS,
+    // A caller that sets its own value wins -- TestingBot passes 600 here too.
     ...configured,
   };
 }

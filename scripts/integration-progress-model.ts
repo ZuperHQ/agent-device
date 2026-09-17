@@ -265,6 +265,8 @@ function summarizeProviderScenarioFlagExclusions() {
         'providerNetworkProfile',
         'providerCustomNetwork',
         'providerNoResignApp',
+        'providerMaxDuration',
+        'providerTabletOnly',
         'awsProjectArn',
         'awsDeviceArn',
         'awsAppArn',

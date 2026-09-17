@@ -107,6 +107,7 @@ test('lease_allocate over HTTP prepares the BrowserStack session end to end', as
       assert.deepEqual(alwaysMatch(create), {
         platformName: 'Android',
         'appium:deviceName': 'Google Pixel 8',
+        'appium:newCommandTimeout': 600,
         'appium:platformVersion': '14.0',
         'appium:app': 'bs://preuploaded',
         'bstack:options': {
@@ -116,6 +117,93 @@ test('lease_allocate over HTTP prepares the BrowserStack session end to end', as
           deviceOrientation: 'portrait',
         },
       });
+    } finally {
+      await closeLoopbackServer(httpServer);
+      await harness.close();
+      await Promise.allSettled(runtimes.map(async (runtime) => await runtime.shutdown()));
+    }
+  });
+}, 15_000);
+
+/**
+ * `--provider-max-duration` is a number the user types, but the lease envelope is
+ * `Record<string, unknown>` whose projection forwards strings and booleans only. Serialized as a
+ * number it is dropped here and the session silently runs with the provider default, which is the
+ * failure this drives end to end: the string the CLI sends must arrive as `maxduration` on the hub.
+ */
+test('lease_allocate over HTTP carries the TestingBot session bounds to the hub', async (t) => {
+  if (await skipWhenLoopbackUnavailable(t, 'TestingBot lease HTTP coverage')) {
+    return;
+  }
+
+  await withProviderScenarioResource(FakeTestingBotServer.start, async (server) => {
+    const providerWebDriver = createProviderWebDriver({
+      clientVersion: CLIENT_VERSION,
+      runHostCommand: async () => {
+        throw new Error('TestingBot scenario must not run host commands');
+      },
+    });
+    const runtimes = providerWebDriver.createDefaultRuntimes({
+      TESTINGBOT_KEY: 'tb-key',
+      TESTINGBOT_SECRET: 'tb-secret',
+      TESTINGBOT_WEBDRIVER_ENDPOINT: `${server.url}/wd/hub/`,
+      TESTINGBOT_API_ENDPOINT: `${server.url}/v1`,
+    });
+    const providers = createProviderDeviceRuntimeRequestProviders(runtimes);
+    const providerModules = runtimes.map((runtime) =>
+      Object.freeze({ runtime, module: runtime.platformRuntimeModule }),
+    );
+    const harness = await createProviderScenarioHarness({
+      ...providers,
+      deviceInventorySource: providers.deviceInventorySource!,
+      platformRuntime: { providerRuntimes: runtimes, providerModules },
+    });
+    const httpServer = await createDaemonHttpServer({
+      token: harness.token,
+      handleRequest: harness.handleRequest,
+    });
+
+    try {
+      const port = await listenOnLoopback(httpServer);
+      const envelope = buildHttpRpcPayload(
+        {
+          token: harness.token,
+          session: 'testingbot-e2e',
+          command: 'lease_allocate',
+          positionals: [],
+          flags: {
+            platform: 'ios',
+            device: 'iPhone 17.*',
+            providerApp: 'tb://preuploaded',
+            providerOsVersion: '26.*',
+            providerSessionName: 'smoke',
+            // Serialized as a string at the CLI boundary, exactly as every other flag is.
+            providerMaxDuration: '3600',
+            providerTabletOnly: true,
+          },
+          meta: {
+            tenantId: 'team-a',
+            runId: 'run-a',
+            leaseBackend: 'android-instance',
+            leaseProvider: CLOUD_WEBDRIVER_PROVIDERS.testingBot,
+            deviceKey: 'webdriver-ios-a',
+            clientId: 'client-a',
+          },
+        },
+        { includeTokenParam: false },
+      );
+
+      const body = await postRpc(port, harness.token, envelope);
+      assert.equal(body.status, 200);
+      assert.equal(body.rpc.error, undefined, `rpc error: ${JSON.stringify(body.rpc.error)}`);
+      assert.ok(
+        body.rpc.result?.ok === true,
+        `daemon rejected allocate: ${JSON.stringify(body.rpc.result ?? body.rpc)}`,
+      );
+
+      const create = server.calls.find((call) => call.path === '/wd/hub/session');
+      assert.ok(create, 'provider never received a session-create call');
+      assertTestingBotSessionBounds(create);
     } finally {
       await closeLoopbackServer(httpServer);
       await harness.close();
@@ -168,6 +256,18 @@ type RpcEnvelope = {
   error?: { message?: string };
 };
 
+function assertTestingBotSessionBounds(create: CloudWebDriverHttpCall): void {
+  const tbOptions = alwaysMatch(create)?.['tb:options'] as Record<string, unknown> | undefined;
+  // The number survived the envelope as a string and was parsed back at prepareSession.
+  assert.equal(tbOptions?.maxduration, 3600);
+  assert.equal(tbOptions?.tabletOnly, true);
+  assert.equal(tbOptions?.name, 'smoke');
+  // The session bounds an agent depends on are not caller-configurable and must always ship.
+  assert.equal(tbOptions?.idletimeout, 600);
+  assert.equal(tbOptions?.realDevice, true);
+  assert.equal(alwaysMatch(create)?.['appium:newCommandTimeout'], 600);
+}
+
 function alwaysMatch(call: CloudWebDriverHttpCall): Record<string, unknown> | undefined {
   return (call.body as { capabilities?: { alwaysMatch?: Record<string, unknown> } } | undefined)
     ?.capabilities?.alwaysMatch;
@@ -185,5 +285,29 @@ class FakeBrowserStackServer extends CloudWebDriverTestServer {
       });
     }
     return cloudWebDriverTestJson({ value: null });
+  }
+}
+
+class FakeTestingBotServer extends CloudWebDriverTestServer {
+  static async start(): Promise<StartedCloudWebDriverTestServer<FakeTestingBotServer>> {
+    return await startCloudWebDriverTestServer(new FakeTestingBotServer());
+  }
+
+  protected respond(call: CloudWebDriverHttpCall) {
+    switch (`${call.method} ${call.path}`) {
+      case 'POST /wd/hub/session':
+        return cloudWebDriverTestJson({
+          value: { sessionId: 'wd-1', capabilities: { platformName: 'iOS' } },
+        });
+      case 'GET /v1/storage/preuploaded':
+        return cloudWebDriverTestJson({
+          app_url: 'tb://preuploaded',
+          type: 'IOS',
+          state: 'DONE',
+          sim_only: false,
+        });
+      default:
+        return cloudWebDriverTestJson({ value: null });
+    }
   }
 }

@@ -155,6 +155,23 @@ Use the installed package or bundle identifier in open, not the app artifact nam
 After close, run agent-device artifacts --json --session adc-browserstack for provider video and logs.`,
 };
 
+// Successful TestingBot connect output from renderConnectSuccess. The device
+// and OS selectors are regular expressions, so the verified line names the
+// concrete device they resolved to rather than echoing the pattern back.
+export const TESTINGBOT_CONNECT_SAMPLE = {
+  command:
+    'agent-device connect testingbot --platform ios --device "iPhone 17.*" --provider-os-version "26.*" --provider-app tb://app-key',
+  output: `Connected successfully with TestingBot.
+Verified: Credentials, device, and uploaded app verified.
+Device: iPhone 17 Pro (ios 26.5) — verified
+App: ZuperiOS.ipa — verified
+No live device session has been created. The first device command shown below will allocate one.
+Next:
+  agent-device open <bundle-id> --relaunch --session adc-testingbot
+Use the installed package or bundle identifier in open, not the app artifact name.
+After close, run agent-device artifacts --json --session adc-testingbot for provider video and logs.`,
+};
+
 // open --foreground succeeded, but its composed snapshot failed. The session
 // remains usable, so recovery is snapshot -i rather than a second open.
 export const FOREGROUND_SNAPSHOT_FAILURE_SAMPLE = {
